@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="author" content="Lampros Lountzis">
+    <link href="../static/style.css" rel="stylesheet">
+    <title>Image Search Engine</title>
+</head>
+<body>
+    <!-- Search Bar -->
+    <section id="search">
+        <div class="container">
+            <form method="post">
+                <input class="search-box" type="text" name="query" placeholder="Search...">
+                <button class="search-btn" type="submit" > Search </button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Summary -->
+    <section id="summary">
+        <div class="container">
+            <h2>Results:</h2>
+        </div>
+    </section>
+
+    <!-- Results -->
+    <section id="results">
+        <div class="container">
+            {% for result in results %}
+            <div class="result">
+                <img class="image-res" src="{{ url_for('static', filename=result['src']) }}">
+                <div class="score">
+                    <p>Score: {{ result["score"] }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+</body>
+</html>
