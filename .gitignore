@@ -1,6 +1,7 @@
 # Misc
 .idea/
 static/data/
+notebooks/cifar10
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
