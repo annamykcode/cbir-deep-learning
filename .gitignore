@@ -3,6 +3,7 @@
 static/data/
 notebooks/cifar10
 notebooks/cifar10-pytorch
+saved-model/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
