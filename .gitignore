@@ -1,6 +1,7 @@
 # Misc
 .idea/
-static/data/
+data/
+static/cifar10/
 notebooks/cifar10
 notebooks/cifar10-pytorch
 saved-model/
