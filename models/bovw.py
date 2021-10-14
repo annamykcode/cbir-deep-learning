@@ -1,60 +1,65 @@
 import numpy as np
-from sklearn.cluster import MiniBatchKMeans
 
 
-def get_visual_words(descriptors, n_clusters=8, n_init=10, max_iter=300):
-    """ Finds the vocabulary of visual words.
+class BoVW:
+    """ Represents Bag of Visual Words model.
 
-    To find the vocabulary of visual words, k-means is used. The centroids found by k-means
-    form the vocabulary.
+    The general idea is to represent an image as a set of features. Features consists of keypoints and descriptors.
+    Keypoints are the “stand out” points in an image, and descriptors are the description of the keypoints. We use
+    the keypoints and descriptors to construct vocabularies and represent each image as a frequency histogram of
+    features that are in the image.
 
-    Args:
-        descriptors:
-            descriptors, as a list of numpy arrays.
-        n_clusters:
-            The number of clusters to form as well as the number of centroids to generate, as int (default=8).
-        n_init:
-            Number of time the k-means algorithm will be run with different centroid seeds, as int (default=10).
-        max_iter:
-            Maximum number of iterations of the k-means algorithm for a single run, as int (default=300)
-
-    Returns:
-        Fitted k-means, holding the vocabulary of visual words .
-    """
-    descriptors_raw = []
-    for des in descriptors:
-        if des is not None:
-            descriptors_raw.extend(des)
-
-    kmeans = MiniBatchKMeans(n_clusters=n_clusters, batch_size=64, n_init=n_init, max_iter=max_iter)
-
-    visual_words = kmeans.fit(descriptors_raw)
-
-    return visual_words
-
-
-def get_vector_representation(model, descriptors):
-    """ Computes the vector representation of an image.
-
-    The representation is based on the image descriptors and a predefined BoVW model. Specifically,
-    it's a histogram of the frequencies of visual words from the vocabulary of the BoVW.
-
-    Args:
+    Attributes:
         model:
-            precomputed k-means model with the vocabulary of visual words.
-        descriptors:
-            descriptors, as numpy array.
-
-    Returns:
-        Vector representations of image, as numpy array.
+            clustering model, as Scikit-learn object.
     """
-    histogram = None
 
-    if descriptors is not None:
-        histogram = np.zeros(model.cluster_centers_.shape[0])
-        for desc in descriptors:
-            # find the cluster each descriptor is close to
-            cluster_idx = model.predict([desc.astype(float)])
-            histogram[cluster_idx] += 1
+    def __init__(self, model):
+        """ Initialized Bag of Visual Words model, with given clustering model.
 
-    return histogram
+        Args:
+            model:
+                clustering model, as Scikit-learn object.
+        """
+        self.model = model
+
+    def get_visual_words(self, descriptors):
+        """ Finds the vocabulary of visual words.
+
+        To find the vocabulary of visual words, a clustering model is used. The centroids found by the clustering
+        algorithm form the vocabulary.
+
+        Args:
+            descriptors:
+                descriptors, as a list of numpy arrays.
+
+        Returns:
+            fitted clustering model, holding the vocabulary of visual words .
+        """
+        visual_words = self.model.fit(descriptors)
+
+        return visual_words
+
+    def get_vector_representation(self, descriptors):
+        """ Computes the vector representation of an image.
+
+        The representation is based on the image descriptors and a predefined BoVW model. Specifically,
+        it's a histogram of the frequencies of visual words from the vocabulary of the BoVW.
+
+        Args:
+            descriptors:
+                descriptors, as numpy array.
+
+        Returns:
+            Vector representations of image, as numpy array.
+        """
+        histogram = None
+
+        if descriptors is not None:
+            histogram = np.zeros(self.model.cluster_centers_.shape[0])
+            for desc in descriptors:
+                # find the cluster each descriptor is close to
+                cluster_idx = self.model.predict([desc.astype(float)])
+                histogram[cluster_idx] += 1
+
+        return histogram
