@@ -9,7 +9,7 @@ def to_grayscale(image):
             RGB image, as numpy array.
 
     Returns:
-        Grayscale image, as numpy array.
+        grayscale image, as numpy array.
     """
     grayscale = cv.cvtColor(image, cv.COLOR_RGB2GRAY)
 
