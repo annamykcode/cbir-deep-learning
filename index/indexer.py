@@ -79,7 +79,7 @@ class Indexer:
 
         es.indices.create(index=name, body=config)
 
-    def index_docs(self, es, name, images):
+    def index_images(self, es, name, images):
         """ Indexes image-s into a given Elasticsearch index.
 
         Each indexed image must have the following structure: ("id", "filename", "path", "features").
