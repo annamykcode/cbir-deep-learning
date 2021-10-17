@@ -44,7 +44,7 @@ class Indexer:
         """
         # delete index if it pre-exists
         if es.indices.exists(index=name):
-            self.logger.warning(f'Elasticsearch index "{name}" already exists! Deleting...')
+            self.logger.warning(f'Elasticsearch index "{name}" already exists. Deleting...')
             es.indices.delete(index=name)
 
         # index configurations and document mapping
@@ -92,10 +92,5 @@ class Indexer:
             images:
                 images to be indexed, as a list of dictionaries.
         """
-        total = 1
         for image in images:
             es.index(index=name, body=image)
-
-            if total % 5000 == 0:
-                self.logger.info(f'{total} images have been indexed into the Elasticsearch index "{name}"...')
-            total += 1
