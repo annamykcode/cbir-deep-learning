@@ -5,6 +5,8 @@ static/cifar10/
 notebooks/cifar10
 notebooks/cifar10-pytorch
 saved-model/
+search-engine-results/
+trec-eval-results/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
