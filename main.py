@@ -1,13 +1,15 @@
 import os
 import numpy as np
-import joblib
-import cv2 as cv
 
 from image import imageprocessor
 from image import extractor
+from image import utils as image_utils
 from models.bovw import BoVW
+from models import utils as model_utils
+from index.indexer import Indexer
+from index.searcher import Searcher
 
-# from indexer.image_indexer import ImageIndexer
+from elasticsearch import Elasticsearch
 # from flask import Flask
 # from flask import render_template
 # from flask import request
@@ -31,18 +33,22 @@ def load_cifar10_data(directory, bovw, mapping):
         images (documents), as list of dictionaries.
         number of total features, as integer.
     """
+    if not os.path.isdir(directory):
+        # TODO: log error not a dir or doesn't exist
+        return None, 0
+
     data = []
     num_features = 0
     for file in os.listdir(directory):
         path = os.path.join(directory, file)
 
-        image_rgb = load_image(path)
+        image_rgb = (image_utils.load_image(path)).astype('uint8')
         if image_rgb is None:
             # TODO: log error
             return None, 0
 
         # process image (from RGB to grayscale)
-        image_grayscale = imageprocessor.to_grayscale(image_rgb)
+        image_grayscale = (imageprocessor.to_grayscale(image_rgb)).astype('uint8')
 
         # extract HOG and SIFT descriptors
         des_hog = extractor.hog_features(image_grayscale)
@@ -56,7 +62,7 @@ def load_cifar10_data(directory, bovw, mapping):
 
         # get image class label as one-hot vector
         label = file[file.find('-') + 1: file.find('.')]
-        label_vec = label_to_vector(label, mapping)
+        label_vec = model_utils.label_to_vector(label, mapping)
 
         # concatenate features and label vector
         features_vec = np.concatenate((fused_features, label_vec), axis=None)
@@ -93,17 +99,21 @@ def load_cifar10_queries(directory, bovw, clf, num_labels):
     Returns:
         query images, as list of dictionaries.
     """
+    if not os.path.isdir(directory):
+        # TODO: log error not a dir or doesn't exist
+        return None
+
     queries = []
     for file in os.listdir(directory):
         path = os.path.join(directory, file)
 
-        image_rgb = load_image(path)
+        image_rgb = (image_utils.load_image(path)).astype('uint8')
         if image_rgb is None:
             # TODO: log error
             return None
 
         # process image (from RGB to grayscale)
-        image_grayscale = imageprocessor.to_grayscale(image_rgb)
+        image_grayscale = (imageprocessor.to_grayscale(image_rgb)).astype('uint8')
 
         # extract HOG and SIFT descriptors
         des_hog = extractor.hog_features(image_grayscale)
@@ -118,12 +128,11 @@ def load_cifar10_queries(directory, bovw, clf, num_labels):
         # predict the query image class label
         pred = clf.predict(fused_features.reshape(1, -1))
         # get image class label as one-hot vector
-        vec = np.zeros(num_labels)
-        vec[pred[0]] = 1
-        query_label = vec[pred[0]]
+        label_vec = np.zeros(num_labels)
+        label_vec[pred[0]] = 1
 
         # concatenate features and label vector
-        features_vec = np.concatenate((fused_features, query_label), axis=None)
+        features_vec = np.concatenate((fused_features, label_vec), axis=None)
 
         query = {
             'id': file[0: file.find('-')],
@@ -136,54 +145,33 @@ def load_cifar10_queries(directory, bovw, clf, num_labels):
     return queries
 
 
-def load_image(path):
-    """ Loads image from provided path.
+def write_results(results, path):
+    """ Create search results file (.txt) according to trec_eval specifications.
+
+    The results file has records of the form: (query_id, iteration, doc_id, rank, similarity, run_id).
 
     Args:
+        results:
+            search results of the form (query_id, images: [id, filename, path, score]), as list of dictionaries.
         path:
-            image path, as string.
-
-    Returns:
-        image, as numpy array.
+             file path, as string.
     """
-    image = cv.imread(path)
+    if (results is None) or (not results):
+        # TODO: logging
+        return
+    elif os.path.isdir(path):
+        # TODO: logging not a file
+        return
 
-    return image
-
-
-def load_model(path):
-    """ Loads machine learning model.
-
-     The model has to be of .joblib format.
-
-    Args:
-        path:
-            model file path, as string.
-
-    Returns:
-        model, as Scikit-learn model.
-    """
-    model = joblib.load(path)
-
-    return model
-
-
-def label_to_vector(label, mapping):
-    """ Translate a CIFAR-10 class label to one-hot vector.
-
-    Args:
-        label:
-            CIFAR-10 class label, as string.
-        mapping:
-            CIFAR-10 mapping, as dictionary.
-
-    Returns:
-        label one-hot vector, as numpy array.
-    """
-    vec = np.zeros(len(mapping))
-    vec[mapping[label]] = 1
-
-    return vec
+    with open(path, 'w') as f:
+        iteration = "0"
+        rank = "0"
+        run_id = "STANDARD"
+        for result in results:
+            # results file contains records of the form: (query_id, iteration, doc_id, rank, similarity, run_id)
+            for image in result["images"]:
+                record = f"{result['query_id']} {iteration} {image['id']} {rank} {image['score']} {run_id}\n"
+                f.write(record)
 
 
 # @app.route('/')
@@ -246,29 +234,42 @@ LABEL_MAPPING = {'airplane': 0,
 # app = Flask(__name__)
 
 if __name__ == '__main__':
-    bovw_model = load_model(PATH_BOVW_MODEL)
-    bovw = BoVW(bovw_model)
-    clf = load_model(PATH_CLASSIFIER)
+    records = []
+    with open('data/qrels.txt', 'r') as f:
+        records = f.readlines()
 
-    print('[INFO] main - Loading CIFAR-10 data...')
-    images, num_features = load_cifar10_data(DIR_TRAIN, bovw, LABEL_MAPPING)
+    with open('data/rels.txt', 'w') as f:
+        for record in records:
+            f.write(record)
+    # bovw_model = model_utils.load_model(PATH_BOVW_MODEL)
+    # bovw = BoVW(bovw_model)
+    # clf = model_utils.load_model(PATH_CLASSIFIER)
+
+    # print('[INFO] main - Loading CIFAR-10 data...')
+    # images, num_features = load_cifar10_data(DIR_TRAIN, bovw, LABEL_MAPPING)
     # TODO log
 
-    print('[INFO] main - Loading CIFAR-10 queries...')
-    queries = load_cifar10_queries(DIR_TEST, bovw, clf, len(LABEL_MAPPING))
+    # print('[INFO] main - Loading CIFAR-10 queries...')
+    # queries = load_cifar10_queries(DIR_TEST, bovw, clf, len(LABEL_MAPPING))
     # TODO log
+
+    # print('[INFO] main - Starting Elasticsearch...')
+    # run Elasticsearch on localhost
+    # es = Elasticsearch(hosts=['localhost:9200'], timeout=30, retry_on_timeout=True)
 
     # print('[INFO] main - Creating index...')
-    #
-    # # run Elasticsearch on localhost
-    # es = ImageIndexer(hosts=['localhost:9200'])
-    #
-    # es.create_index(index_name=INDEX_NAME, num_features=num_features)
-    #
+    # indexer = Indexer()
+    # indexer.create_index(es=es, name="cifar10", number_of_shards=30, number_of_replicas=0, num_features=num_features)
+
     # print('[INFO] main - Indexing image files...')
-    #
-    # es.index_docs(index_name=INDEX_NAME, dataset=images)
+    # indexer.index_images(es=es, name="cifar10", images=images)
+
+    # print('[INFO] main - Searching index...')
+    # searcher = Searcher()
+    # results = searcher.search_index(es=es, name="cifar10", queries=queries, k=100)
+
+    # print('[INFO] main - Writing results...')
+    # write_results(results, 'search-engine-results/bovw/results-100.txt')
 
     # print('[INFO] main - Running application...')
-    #
     # app.run()
