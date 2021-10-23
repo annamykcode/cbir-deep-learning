@@ -1,4 +1,22 @@
 import numpy as np
+import joblib
+
+
+def load_bovw_model(path):
+    """ Loads Bag of Visual Words (BoVW) model.
+
+     The BoVW model has to be of .joblib format.
+
+    Args:
+        path:
+            BoVW model file path, as string.
+
+    Returns:
+        BoVW model, as Scikit-learn model.
+    """
+    model = joblib.load(path)
+
+    return model
 
 
 class BoVW:
