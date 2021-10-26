@@ -20,7 +20,7 @@ def set_parameter_requires_grad(model, feature_extracting):
             param.requires_grad = False
 
 
-def initialize_model(model_name, pretrained, num_labels, feature_extracting):
+def initialize_model( pretrained, num_labels, feature_extracting):
     """ Initialize pretrained deep-learning model and reshape the last layer with the correct number of classes.
 
     The supported pretrained models are:
@@ -33,8 +33,6 @@ def initialize_model(model_name, pretrained, num_labels, feature_extracting):
     have the same number of outputs as the number of classes in our the dataset.
 
     Args:
-        model_name:
-            model name (alexnet, vgg-16, googlenet, resnet-50), as string.
         pretrained:
             whether or not we want the pretrained version, as boolean.
         num_labels:
@@ -46,35 +44,11 @@ def initialize_model(model_name, pretrained, num_labels, feature_extracting):
     Returns:
         deep-learning model, as pytorch object.
     """
-    model = None
+    model = models.vgg16(pretrained=pretrained)
 
-    if model_name == 'alexnet':
-        model = models.alexnet(pretrained=pretrained)
+    set_parameter_requires_grad(model, feature_extracting)
 
-        set_parameter_requires_grad(model, feature_extracting)
-
-        last_layer_in_ftrs = model.classifier[6].in_features
-        model.classifier[6] = nn.Linear(last_layer_in_ftrs, num_labels)
-    elif model_name == 'vgg-16':
-        model = models.vgg16(pretrained=pretrained)
-
-        set_parameter_requires_grad(model, feature_extracting)
-
-        last_layer_in_ftrs = model.classifier[6].in_features
-        model.classifier[6] = nn.Linear(last_layer_in_ftrs, num_labels)
-    elif model_name == 'googlenet':
-        model = models.googlenet(pretrained=pretrained)
-
-        set_parameter_requires_grad(model, feature_extracting)
-
-        last_layer_in_ftrs = model.fc.in_features
-        model.fc = nn.Linear(last_layer_in_ftrs, num_labels)
-    elif model_name == 'resnet-50':
-        model = models.resnet50(pretrained=pretrained)
-
-        set_parameter_requires_grad(model, feature_extracting)
-
-        last_layer_in_ftrs = model.fc.in_features
-        model.fc = nn.Linear(last_layer_in_ftrs, num_labels)
+    last_layer_in_ftrs = model.classifier[6].in_features
+    model.classifier[6] = nn.Linear(last_layer_in_ftrs, num_labels)
 
     return model
