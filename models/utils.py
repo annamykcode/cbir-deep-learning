@@ -44,7 +44,7 @@ def fit(dataloader, model, loss_fn, optimizer, device, print_loss=False):
             print(f"loss: {loss:>7f} [{current:>5d}/{size:>5d}]")
 
 
-def predict(dataloader, model, loss_fn, device):
+def predict(dataloader, model, device):
     """ Predict with deep-learning model.
 
     Args:
@@ -52,8 +52,6 @@ def predict(dataloader, model, loss_fn, device):
             pytorch DataLoader object.
         model:
             deep learning model, as pytorch object.
-        loss_fn:
-            loss function, as pytorch object.
         device:
             device where the deep-learning model will run (cpu, gpu), as string.
 
@@ -62,34 +60,18 @@ def predict(dataloader, model, loss_fn, device):
          predictions, as a list of integers.
          ground truth, as a list of integers.
     """
-    size = len(dataloader.dataset)
-    num_batches = len(dataloader)
-
-    test_loss = 0
-
-    pred_concat = []
-    y_concat = []
-
     model.eval()  # put on evaluation mode
     with torch.no_grad():
-        for X, Y in dataloader:
-            X, Y = X.to(device), Y.to(device)
+        for X in dataloader:
+            X = X.to(device)
 
+            # predict class label
             pred = model(X)
 
-            test_loss += loss_fn(pred, Y).item()
+            # get predicted class label index
+            label = pred.argmax(1).item()
 
-            # predictions to one-hot vectors
-            for label in pred.argmax(1):
-                pred_concat.append(label.item())
-
-            # ground truth to one-hot vectors
-            for label in Y:
-                y_concat.append(label.item())
-
-    test_loss /= num_batches
-
-    return test_loss, pred_concat, y_concat
+    return label
 
 
 def label_to_vector(label, mapping):
@@ -104,7 +86,7 @@ def label_to_vector(label, mapping):
     Returns:
         label one-hot vector, as numpy array.
     """
-    vec = np.zeros(len(mapping))
+    vec = np.zeros(len(mapping), dtype='int64')
     vec[mapping[label]] = 1
 
     return vec
