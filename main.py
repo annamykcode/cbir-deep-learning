@@ -1,11 +1,13 @@
 import os
 import numpy as np
-
-from image import imageprocessor
-from image import extractor
-from image import utils as image_utils
-from models.bovw import BoVW
+import joblib
+from PIL import Image
+import torch
+import torchvision.transforms as transforms
+from models.image_dataset import ImageDataset
+from torch.utils.data import DataLoader
 from models import utils as model_utils
+from models import pretrained_models
 from index.indexer import Indexer
 from index.searcher import Searcher
 
@@ -14,8 +16,10 @@ from elasticsearch import Elasticsearch
 # from flask import render_template
 # from flask import request
 
+hook_features = None
 
-def load_cifar10_data(directory, bovw, mapping):
+
+def load_cifar10_data(directory, model, pca, mapping):
     """ Read CIFAR-10 train data and prepare them for indexing.
 
     For the CIFAR-10 images to be indexed in Elasticsearch, they need to have the structure of a document with indexable
@@ -24,8 +28,10 @@ def load_cifar10_data(directory, bovw, mapping):
     Args:
         directory:
             CIFAR-10 train data directory.
-        bovw:
-            bag of visual words model, as BoVW object.
+        model:
+            deep-learning model, as Pytorch object.
+        pca:
+           Principal Component Analysis (PCA), as scikit-learn model.
         mapping:
             CIFAR-10 label to index mapping, as dictionary.
 
@@ -37,35 +43,43 @@ def load_cifar10_data(directory, bovw, mapping):
         # TODO: log error not a dir or doesn't exist
         return None, 0
 
+    transform = transforms.Compose([
+        transforms.Resize(224),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+
+    device = torch.device(f"cuda" if torch.cuda.is_available() else "cpu")
+    print('Using {} device'.format(device))
+
     data = []
     num_features = 0
     for file in os.listdir(directory):
         path = os.path.join(directory, file)
 
-        image_rgb = (image_utils.load_image(path)).astype('uint8')
-        if image_rgb is None:
+        image = Image.open(path)
+        if image is None:
             # TODO: log error
             return None, 0
 
-        # process image (from RGB to grayscale)
-        image_grayscale = (imageprocessor.to_grayscale(image_rgb)).astype('uint8')
+        dataset = ImageDataset([image], transform)
+        dataloader = DataLoader(dataset, batch_size=64, shuffle=False)
 
-        # extract HOG and SIFT descriptors
-        des_hog = extractor.hog_features(image_grayscale)
-        kp_sift, des_sift = extractor.sift_features(image_grayscale)
+        model_utils.predict(dataloader, model, device)
 
-        # get bag of visual words representation of SIFT features
-        sift_features = bovw.get_vector_representation(des_sift)
+        # extract features
+        features = hook_features
 
-        # early fusion (HOG & SIFT features)
-        fused_features = np.concatenate((des_hog, sift_features), axis=None)
+        # dimensionality reduction
+        features = pca.transform(features)
 
         # get image class label as one-hot vector
-        label = file[file.find('-') + 1: file.find('.')]
-        label_vec = model_utils.label_to_vector(label, mapping)
+        label_str = file[file.find('-') + 1: file.find('.')]
+        label_vec = model_utils.label_to_vector(label_str, mapping)
 
         # concatenate features and label vector
-        features_vec = np.concatenate((fused_features, label_vec), axis=None)
+        features_vec = np.concatenate((features, label_vec), axis=None)
 
         num_features = features_vec.shape[0]  # total number of features of an image
 
@@ -80,7 +94,7 @@ def load_cifar10_data(directory, bovw, mapping):
     return data, num_features
 
 
-def load_cifar10_queries(directory, bovw, clf, num_labels):
+def load_cifar10_queries(directory, model, pca, num_labels):
     """ Read CIFAR-10 test data and create queries from them.
 
     For the CIFAR-10 images to be valid queries, they need to have the following structure:
@@ -89,10 +103,10 @@ def load_cifar10_queries(directory, bovw, clf, num_labels):
     Args:
         directory:
             CIFAR-10 test data directory.
-        bovw:
-            bag of visual words model, as BoVW object.
-        clf:
-           classifier for image prediction, as Scikit-learn object.
+        model:
+            deep-learning model, as Pytorch object.
+        pca:
+           Principal Component Analysis (PCA), as scikit-learn model.
         num_labels:
             number of class labels in CIFAR-10, as integer.
 
@@ -103,36 +117,42 @@ def load_cifar10_queries(directory, bovw, clf, num_labels):
         # TODO: log error not a dir or doesn't exist
         return None
 
+    transform = transforms.Compose([
+        transforms.Resize(224),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+
+    device = torch.device(f"cuda" if torch.cuda.is_available() else "cpu")
+    print('Using {} device'.format(device))
+
     queries = []
     for file in os.listdir(directory):
         path = os.path.join(directory, file)
 
-        image_rgb = (image_utils.load_image(path)).astype('uint8')
-        if image_rgb is None:
+        image = Image.open(path)
+        if image is None:
             # TODO: log error
             return None
 
-        # process image (from RGB to grayscale)
-        image_grayscale = (imageprocessor.to_grayscale(image_rgb)).astype('uint8')
+        dataset = ImageDataset([image], transform)
+        dataloader = DataLoader(dataset, batch_size=64, shuffle=False)
 
-        # extract HOG and SIFT descriptors
-        des_hog = extractor.hog_features(image_grayscale)
-        kp_sift, des_sift = extractor.sift_features(image_grayscale)
+        pred = model_utils.predict(dataloader, model, device)
 
-        # get bag of visual words representation of SIFT features
-        sift_features = bovw.get_vector_representation(des_sift)
+        # extract features
+        features = hook_features
 
-        # early fusion (HOG & SIFT features)
-        fused_features = np.concatenate((des_hog, sift_features), axis=None)
+        # dimensionality reduction
+        features = pca.transform(features)
 
-        # predict the query image class label
-        pred = clf.predict(fused_features.reshape(1, -1))
         # get image class label as one-hot vector
-        label_vec = np.zeros(num_labels)
-        label_vec[pred[0]] = 1
+        label_vec = np.zeros(num_labels, dtype='int64')
+        label_vec[pred] = 1
 
         # concatenate features and label vector
-        features_vec = np.concatenate((fused_features, label_vec), axis=None)
+        features_vec = np.concatenate((features, label_vec), axis=None)
 
         query = {
             'id': file[0: file.find('-')],
@@ -172,6 +192,13 @@ def write_results(results, path):
             for image in result["images"]:
                 record = f"{result['query_id']} {iteration} {image['id']} {rank} {image['score']} {run_id}\n"
                 f.write(record)
+
+
+def get_features():
+    def hook(model, input, output):
+        global hook_features
+        hook_features = output.detach().cpu().numpy()
+    return hook
 
 
 # @app.route('/')
@@ -217,8 +244,8 @@ def write_results(results, path):
 
 DIR_TRAIN = 'static/cifar10/train'
 DIR_TEST = 'static/cifar10/test'
-PATH_BOVW_MODEL = 'saved-model/bovw.joblib'
-PATH_CLASSIFIER = 'saved-model/logistic-regression.joblib'
+PATH_VGG_16 = 'saved-model/vgg16-weights.pth'
+PATH_PCA = 'saved-model/pca.joblib'
 INDEX_NAME = 'image-retrieval'
 LABEL_MAPPING = {'airplane': 0,
                  'automobile': 1,
@@ -234,28 +261,32 @@ LABEL_MAPPING = {'airplane': 0,
 # app = Flask(__name__)
 
 if __name__ == '__main__':
-    records = []
-    with open('data/qrels.txt', 'r') as f:
-        records = f.readlines()
+    model = pretrained_models.initialize_model(pretrained=True,
+                                               num_labels=len(LABEL_MAPPING),
+                                               feature_extracting=True)
+    model.load_state_dict(torch.load(PATH_VGG_16, map_location='cuda:0'))
 
-    with open('data/rels.txt', 'w') as f:
-        for record in records:
-            f.write(record)
-    # bovw_model = model_utils.load_model(PATH_BOVW_MODEL)
-    # bovw = BoVW(bovw_model)
-    # clf = model_utils.load_model(PATH_CLASSIFIER)
+    device = torch.device(f"cuda" if torch.cuda.is_available() else "cpu")
+    print('Using {} device'.format(device))
+
+    model.to(device)
+
+    # register hook
+    model.classifier[5].register_forward_hook(get_features())
+
+    pca = joblib.load(PATH_PCA)
 
     # print('[INFO] main - Loading CIFAR-10 data...')
-    # images, num_features = load_cifar10_data(DIR_TRAIN, bovw, LABEL_MAPPING)
+    # images, num_features = load_cifar10_data(DIR_TRAIN, model, pca, LABEL_MAPPING)
     # TODO log
 
-    # print('[INFO] main - Loading CIFAR-10 queries...')
-    # queries = load_cifar10_queries(DIR_TEST, bovw, clf, len(LABEL_MAPPING))
+    print('[INFO] main - Loading CIFAR-10 queries...')
+    queries = load_cifar10_queries(DIR_TEST, model, pca, len(LABEL_MAPPING))
     # TODO log
 
-    # print('[INFO] main - Starting Elasticsearch...')
     # run Elasticsearch on localhost
-    # es = Elasticsearch(hosts=['localhost:9200'], timeout=30, retry_on_timeout=True)
+    print('[INFO] main - Starting Elasticsearch...')
+    es = Elasticsearch(hosts=['localhost:9200'], timeout=60, retry_on_timeout=True)
 
     # print('[INFO] main - Creating index...')
     # indexer = Indexer()
@@ -264,12 +295,12 @@ if __name__ == '__main__':
     # print('[INFO] main - Indexing image files...')
     # indexer.index_images(es=es, name="cifar10", images=images)
 
-    # print('[INFO] main - Searching index...')
-    # searcher = Searcher()
-    # results = searcher.search_index(es=es, name="cifar10", queries=queries, k=100)
+    print('[INFO] main - Searching index...')
+    searcher = Searcher()
+    results = searcher.search_index(es=es, name="cifar10", queries=queries, k=100)
 
-    # print('[INFO] main - Writing results...')
-    # write_results(results, 'search-engine-results/bovw/results-100.txt')
+    print('[INFO] main - Writing results...')
+    write_results(results, 'search-engine-results/vgg-16/results-100.txt')
 
     # print('[INFO] main - Running application...')
     # app.run()
