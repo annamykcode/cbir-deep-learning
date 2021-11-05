@@ -4,39 +4,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="author" content="Lampros Lountzis">
-    <link href="../static/style.css" rel="stylesheet">
-    <title>Image Search Engine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Ubuntu&display=swap" rel="stylesheet">
+    <link href="../static/css/style.css" rel="stylesheet">
+    <title>CBIR with Deep Learning</title>
 </head>
 <body>
-    <!-- Search Bar -->
-    <section id="search">
-        <div class="container">
+    <div class="container">
+        <nav class="navbar">
+            <div class="creator">
+                <h4>Lampros Lountzis</h4>
+            </div>
+            <div class="project-name">
+                <h4>Content Based Image Retrieval with Deep Learning</h4>
+            </div>
+        </nav>
+
+        <section class="search">
+            <!-- TODO: header and maybe some words -->
             <form method="post">
-                <input class="search-box" type="text" name="query" placeholder="Search...">
-                <button class="search-btn" type="submit" > Search </button>
+                <input class="upload-btn" id="upload-btn" type="file" accept="image/png, image/jpeg" name="image-file">
+                <label for="upload-btn">Upload image</label>
+                <button class="search-btn" id="search-btn" type="submit" >Search</button>
             </form>
-        </div>
-    </section>
+            <!-- TODO: display file name -->
+        </section>
 
-    <!-- Summary -->
-    <section id="summary">
-        <div class="container">
-            <h2>Results:</h2>
-        </div>
-    </section>
-
-    <!-- Results -->
-    <section id="results">
-        <div class="container">
+        <section class="results">
             {% for result in results %}
             <div class="result">
-                <img class="image-res" src="{{ url_for('static', filename=result['src']) }}">
+                <div class="id">
+                    <p><b>ID:</b>{{ result["id"] }}</p>
+                </div>
+                <div class="title">
+                    <p><b>Filename:</b>{{ result["filename"] }}</p>
+                </div>
+                <div class="image">
+                    <img src="{{ url_for('static', filename=result['path']) }}">
+                </div>
                 <div class="score">
-                    <p>Score: {{ result["score"] }}</p>
+                    <p><b>Score:</b>{{ result["score"] }}</p>
                 </div>
             </div>
             {% endfor %}
-        </div>
-    </section>
+        </section>
+    </div>
 </body>
 </html>
