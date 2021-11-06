@@ -131,17 +131,29 @@ button:hover{
 }
 
 .result {
-    width: 90%;
+    width: 40%;
     margin: 20px;
     padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center; 
     line-height: 2.5;
     word-wrap: break-word;
     box-shadow: 0 5px 10px 0px rgba(0,0,0,0.2);
     transition: 0.3s;
 }
 
+.image {
+    display: flex;
+    justify-content: center;
+    text-align: center; 
+}
+
+.image img{
+    width: 60%;
+}
+
 .result:hover{
     box-shadow: 0 5px 10px 0px rgba(0,0,0,0.5);
 }
-
-/* TODO: style image */
