@@ -2,6 +2,7 @@ import os
 import sys
 import logging
 import joblib
+from tqdm import tqdm
 from PIL import Image
 import numpy as np
 import torch
@@ -45,7 +46,7 @@ def create_docs(directory, model, pca, transform, mapping):
             CIFAR-10 label to index mapping, as dictionary.
 
     Returns:
-        images (documents), as list of dictionaries.
+        image documents, as list of dictionaries.
         number of total features, as integer.
     """
     if not os.path.isdir(directory):
@@ -60,40 +61,136 @@ def create_docs(directory, model, pca, transform, mapping):
 
     data = []
     num_features = 0
-    for file in os.listdir(directory):
+    for file in tqdm(os.listdir(directory)):
         path = os.path.join(directory, file)
 
-        # create dataset and dataloader objects for Pytorch
-        dataset = None
-        dataloader = None
         with Image.open(path) as image:
+            # create dataset and dataloader objects for Pytorch
             dataset = ImageDataset([image], transform)
             dataloader = DataLoader(dataset, batch_size=64, shuffle=False)
 
-        # pass image trough deep-learning model to gain the image embedding vector
-        predict(dataloader, model, device)
-        # extract the image embeddings vector
-        embedding = hook_features
-        # reduce the dimensionality of the embedding vector
-        embedding = pca.transform(embedding)
+            # pass image trough deep-learning model to gain the image embedding vector
+            predict(dataloader, model, device)
+            # extract the image embeddings vector
+            embedding = hook_features
+            # reduce the dimensionality of the embedding vector
+            embedding = pca.transform(embedding)
 
-        # get image class label as one-hot vector
-        label_str = file[file.find('-') + 1: file.find('.')]
-        label_vec = label_to_vector(label_str, mapping)
+            # get image class label as one-hot vector
+            label_str = file[file.find('-') + 1: file.find('.')]
+            label_vec = label_to_vector(label_str, mapping)
 
-        # concatenate embeddings and label vector
-        features_vec = np.concatenate((embedding, label_vec), axis=None)
-        num_features = features_vec.shape[0]  # total number of image features
+            # concatenate embeddings and label vector
+            features_vec = np.concatenate((embedding, label_vec), axis=None)
+            num_features = features_vec.shape[0]  # total number of image features
 
-        doc = {
-            'id': file[0: file.find('-')],
-            'filename': file,
-            'path': path,
-            'features': features_vec
-        }
-        data.append(doc)
+            doc = {
+                'id': file[0: file.find('-')],
+                'filename': file,
+                'path': path,
+                'features': features_vec
+            }
+            data.append(doc)
 
     return data, num_features
+
+
+def create_queries(directory, model, pca, transform, num_labels):
+    """ Read CIFAR-10 test data and create Elasticsearch queries.
+
+    The image queries structure is the following: ("id", "filename", "path", "features").
+    The "features" field refers to the image feature vector which consists of:
+        * the image embeddings found by the deep-learning model and then reduced using PCA,
+        * the one-hot class label vector, where the class is predicted by the deep-learning model.
+
+    Args:
+        directory:
+            CIFAR-10 test data directory, as string.
+        model:
+            deep-learning model, as Pytorch object.
+        pca:
+           Principal Component Analysis (PCA), as scikit-learn model.
+        transform:
+            image transformations, as Pytorch object.
+        num_labels:
+            number of class labels in CIFAR-10, as integer.
+
+    Returns:
+        image queries, as list of dictionaries.
+    """
+    if not os.path.isdir(directory):
+        logger.error(f"Provided path doesn't exist or isn't a directory ...")
+        return None
+    elif model is None:
+        logger.error(f"Provided deep-learning model is None ...")
+        return None
+    elif pca is None:
+        logger.error(f"Provided PCA model is None ...")
+        return None
+
+    queries = []
+    for file in tqdm(os.listdir(directory)):
+        path = os.path.join(directory, file)
+
+        with Image.open(path) as image:
+            # create dataset and dataloader objects for Pytorch
+            dataset = ImageDataset([image], transform)
+            dataloader = DataLoader(dataset, batch_size=64, shuffle=False)
+
+            # pass image trough deep-learning model to gain the image embedding vector
+            # and predict the class
+            pred = predict(dataloader, model, device)
+
+            # extract the image embeddings vector
+            embedding = hook_features
+            # reduce the dimensionality of the embedding vector
+            embedding = pca.transform(embedding)
+
+            # get image class label as one-hot vector
+            label_vec = np.zeros(num_labels, dtype='int64')
+            label_vec[pred] = 1
+
+            # concatenate embeddings and label vector
+            features_vec = np.concatenate((embedding, label_vec), axis=None)
+
+            query = {
+                'id': file[0: file.find('-')],
+                'filename': file,
+                'path': path,
+                'features': features_vec
+            }
+            queries.append(query)
+
+    return queries
+
+
+def write_results(results, path):
+    """ Create search results file (.txt) according to trec_eval specifications.
+
+    The results file has records of the form: (query_id, iteration, doc_id, rank, similarity, run_id).
+
+    Args:
+        results:
+            search results of the form (query_id, images: [id, filename, path, score]), as list of dictionaries.
+        path:
+             file path, as string.
+    """
+    if (results is None) or (not results):
+        logger.error("Number of search results is 0 ...")
+        return
+    elif os.path.isdir(path):
+        logger.error("Provided path is a directory and not a file ...")
+        return
+
+    with open(path, 'w') as f:
+        iteration = "0"
+        rank = "0"
+        run_id = "STANDARD"
+        for result in tqdm(results):
+            # results file contains records of the form: (query_id, iteration, doc_id, rank, similarity, run_id)
+            for image in result["images"]:
+                record = f"{result['query_id']} {iteration} {image['id']} {rank} {image['score']} {run_id}\n"
+                f.write(record)
 
 
 def get_features():
@@ -159,13 +256,13 @@ if __name__ == '__main__':
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    logger.info("Loading CIFAR-10 data and creating Elasticsearch documents ...")
+    logger.info("Loading CIFAR-10 train data and creating Elasticsearch documents ...")
     images, num_features = create_docs(dir_train, model, pca, transform, label_mapping)
     if (images is None) or (num_features == 0):
         logger.error("Number of Elasticsearch documents is 0 ...")
         sys.exit(1)
 
     # Elasticsearch config
-    INDEX_NAME = 'cifar10'
+    index_name = 'cifar10'
 
     # app.run()
