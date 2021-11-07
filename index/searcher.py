@@ -1,6 +1,7 @@
 import logging
+from tqdm import tqdm
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(name)s] : %(message)s')
+logging.basicConfig(level=logging.WARNING, format='%(asctime)s %(levelname)s [%(name)s] : %(message)s')
 
 
 class Searcher:
@@ -37,7 +38,7 @@ class Searcher:
             (query_id, images: [id, filename, path, score]).
         """
         results = []
-        for query in queries:
+        for query in tqdm(queries):
             # construct query
             query_body = {
                 "query": {

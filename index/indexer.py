@@ -1,6 +1,7 @@
 import logging
+from tqdm import tqdm
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(name)s] : %(message)s')
+logging.basicConfig(level=logging.WARNING, format='%(asctime)s %(levelname)s [%(name)s] : %(message)s')
 
 
 class Indexer:
@@ -43,9 +44,9 @@ class Indexer:
                 size of feature vector, as integer.
         """
         # delete index if it pre-exists
-        if es.indices.exists(index=name):
-            self.logger.warning(f'Elasticsearch index "{name}" already exists. Deleting...')
-            es.indices.delete(index=name)
+        if es.indices.exists(index=[name]):
+            self.logger.warning(f'Elasticsearch index "{name}" already exists. Deleting ...')
+            es.indices.delete(index=[name])
 
         # index configurations and document mapping
         config = {
@@ -80,9 +81,10 @@ class Indexer:
         es.indices.create(index=name, body=config)
 
     def index_images(self, es, name, images):
-        """ Indexes image-s into a given Elasticsearch index.
+        """ Indexes images into an Elasticsearch index.
 
-        Each indexed image must have the following structure: ("id", "filename", "path", "features").
+        Each indexable image must have the structure of an indexable document, which is as follows:
+        ("id", "filename", "path", "features").
 
         Args:
             es:
@@ -90,7 +92,7 @@ class Indexer:
             name:
                 index name, as string.
             images:
-                images to be indexed, as a list of dictionaries.
+                image documents, as a list of dictionaries.
         """
-        for image in images:
+        for image in tqdm(images):
             es.index(index=name, body=image)
