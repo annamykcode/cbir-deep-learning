@@ -1,6 +1,6 @@
 import os
 import sys
-import logging
+# import logging
 import joblib
 from tqdm import tqdm
 from PIL import Image
@@ -11,18 +11,64 @@ from torch.utils.data import DataLoader
 from models.image_dataset import ImageDataset
 from models import pretrained_models
 from models.utils import predict, label_to_vector
-# from flask import Flask
+from elasticsearch import Elasticsearch
+from index.indexer import Indexer
+from index.searcher import Searcher
+from flask import Flask, render_template, request
+
 
 # logger config
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(name)s] : %(message)s')
-logger = logging.getLogger(__name__)
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(name)s] : %(message)s')
+# logger = logging.getLogger(__name__)
 
-# app = Flask(__name__)
-# @app.route('/')
-# def hello_world():  # put application's code here
-#     return 'Hello World!'
+app = Flask(__name__)
 
-hook_features = []
+
+@app.route('/')
+def load_page():
+    """ Render index.html webpage. """
+    return render_template('index.html')
+
+
+@app.route('/', methods=['POST'])
+def search():
+    file = request.files['image-file'].filename  # image query an image string path
+    # logger.info(f"Searching for {file}")
+
+    path = os.path.join(dir_test, file)
+    with Image.open(path) as image:
+        # create dataset and dataloader objects for Pytorch
+        dataset = ImageDataset([image], transform)
+        dataloader = DataLoader(dataset, batch_size=64, shuffle=False)
+
+        # pass image trough deep-learning model to gain the image embedding vector
+        # and predict the class
+        pred = predict(dataloader, model, device)
+
+        # extract the image embeddings vector
+        embedding = hook_features
+        # reduce the dimensionality of the embedding vector
+        embedding = pca.transform(embedding)
+
+        # get image class label as one-hot vector
+        label_vec = np.zeros(len(label_mapping), dtype='int64')
+        label_vec[pred] = 1
+
+        # concatenate embeddings and label vector
+        features_vec = np.concatenate((embedding, label_vec), axis=None)
+
+        filename = os.path.split(file)[1]
+        query = {
+            'id': filename[0: filename.find('-')],
+            'filename': filename,
+            'path': path,
+            'features': features_vec
+        }
+
+    results = searcher.search_index(es=es, name=index_name, queries=[query], k=10)
+    results = results[0]['images']
+
+    return render_template('index.html', results=results)
 
 
 def create_docs(directory, model, pca, transform, mapping):
@@ -50,13 +96,13 @@ def create_docs(directory, model, pca, transform, mapping):
         number of total features, as integer.
     """
     if not os.path.isdir(directory):
-        logger.error(f"Provided path doesn't exist or isn't a directory ...")
+        # logger.error(f"Provided path doesn't exist or isn't a directory ...")
         return None, 0
     elif model is None:
-        logger.error(f"Provided deep-learning model is None ...")
+        # logger.error(f"Provided deep-learning model is None ...")
         return None, 0
     elif pca is None:
-        logger.error(f"Provided PCA model is None ...")
+        # logger.error(f"Provided PCA model is None ...")
         return None, 0
 
     data = []
@@ -119,13 +165,13 @@ def create_queries(directory, model, pca, transform, num_labels):
         image queries, as list of dictionaries.
     """
     if not os.path.isdir(directory):
-        logger.error(f"Provided path doesn't exist or isn't a directory ...")
+        # logger.error(f"Provided path doesn't exist or isn't a directory ...")
         return None
     elif model is None:
-        logger.error(f"Provided deep-learning model is None ...")
+        # logger.error(f"Provided deep-learning model is None ...")
         return None
     elif pca is None:
-        logger.error(f"Provided PCA model is None ...")
+        # logger.error(f"Provided PCA model is None ...")
         return None
 
     queries = []
@@ -176,10 +222,10 @@ def write_results(results, path):
              file path, as string.
     """
     if (results is None) or (not results):
-        logger.error("Number of search results is 0 ...")
+        # logger.error("Number of search results is 0 ...")
         return
     elif os.path.isdir(path):
-        logger.error("Provided path is a directory and not a file ...")
+        # logger.error("Provided path is a directory and not a file ...")
         return
 
     with open(path, 'w') as f:
@@ -191,6 +237,10 @@ def write_results(results, path):
             for image in result["images"]:
                 record = f"{result['query_id']} {iteration} {image['id']} {rank} {image['score']} {run_id}\n"
                 f.write(record)
+
+
+# hook variable for VGG-16 image embeddings
+hook_features = []
 
 
 def get_features():
@@ -213,7 +263,6 @@ if __name__ == '__main__':
     # path for CIFAR-10 train and test datasets
     dir_train = 'static/cifar10/train'
     dir_test = 'static/cifar10/test'
-
     # CIFAR-10 labels to numbers
     label_mapping = {
         'airplane': 0,
@@ -230,9 +279,9 @@ if __name__ == '__main__':
 
     # get available device (CPU/GPU)
     device = torch.device(f"cuda" if torch.cuda.is_available() else "cpu")
-    logger.info(f'Using {device} device ...')
+    # logger.info(f'Using {device} device ...')
 
-    logger.info(f'Loading VGG-16 model from {path_vgg_16} ...')
+    # logger.info(f'Loading VGG-16 model from {path_vgg_16} ...')
     # initialize VGG-16
     model = pretrained_models.initialize_model(pretrained=True,
                                                num_labels=len(label_mapping),
@@ -244,7 +293,7 @@ if __name__ == '__main__':
     # register hook
     model.classifier[5].register_forward_hook(get_features())
 
-    logger.info(f'Loading PCA model from {path_pca} ...')
+    # logger.info(f'Loading PCA model from {path_pca} ...')
     # load PCA pretrained model
     pca = joblib.load(path_pca)
 
@@ -256,13 +305,52 @@ if __name__ == '__main__':
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    logger.info("Loading CIFAR-10 train data and creating Elasticsearch documents ...")
-    images, num_features = create_docs(dir_train, model, pca, transform, label_mapping)
-    if (images is None) or (num_features == 0):
-        logger.error("Number of Elasticsearch documents is 0 ...")
-        sys.exit(1)
+    # logger.info("Loading CIFAR-10 train data and creating Elasticsearch documents ...")
+    # images, num_features = create_docs(dir_train, model, pca, transform, label_mapping)
+    # if (images is None) or (num_features == 0):
+    #     logger.error("Number of Elasticsearch documents is 0 ...")
+    #     sys.exit(1)
 
-    # Elasticsearch config
+    # logger.info("Loading CIFAR-10 test data and creating Elasticsearch queries ...")
+    # queries = create_queries(dir_test, model, pca, transform, len(label_mapping))
+    # if queries is None:
+    #     logger.error("Number of Elasticsearch queries is 0 ...")
+    #     sys.exit(1)
+
+    # Elasticsearch and index config
+    hosts = ['localhost:9200']
     index_name = 'cifar10'
+    number_of_shards = 30
+    number_of_replicas = 0
 
-    # app.run()
+    # logger.info(f"Running Elasticsearch on {hosts} ...")
+    # run Elasticsearch
+    es = Elasticsearch(hosts=hosts, timeout=60, retry_on_timeout=True)
+
+    # logger.info(f"Creating Elasticsearch index {index_name} ...")
+    # # creating Elasticsearch index
+    # indexer = Indexer()
+    # indexer.create_index(es=es,
+    #                      name=index_name,
+    #                      number_of_shards=number_of_shards,
+    #                      number_of_replicas=number_of_replicas,
+    #                      num_features=num_features)
+
+    # logger.info(f"Indexing CIFAR-10 images ...")
+    # # indexing CIFAR-10 image documents
+    # indexer.index_images(es=es, name=index_name, images=images)
+
+    # logger.info(f"Searching Elasticsearch index {index_name} ...")
+    searcher = Searcher()
+    # results = searcher.search_index(es=es, name=index_name, queries=queries, k=100)
+    # if (results is None) or (not results):
+    #     logger.error("Number of search results is 0 ...")
+    #     sys.exit(1)
+
+    # logger.info(f"Searching Elasticsearch index {index_name} ...")
+    # write_results(results, path_results)
+
+    # logger.info("Running application ...")
+    app.run()
+
+
