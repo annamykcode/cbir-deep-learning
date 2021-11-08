@@ -1,6 +1,6 @@
 import os
 import sys
-# import logging
+import logging
 import joblib
 from tqdm import tqdm
 from PIL import Image
@@ -17,11 +17,8 @@ from index.searcher import Searcher
 from flask import Flask, render_template, request
 
 
-# logger config
-# logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(name)s] : %(message)s')
-# logger = logging.getLogger(__name__)
-
 app = Flask(__name__)
+app.logger.setLevel(logging.INFO)
 
 
 @app.route('/')
@@ -33,7 +30,7 @@ def load_page():
 @app.route('/', methods=['POST'])
 def search():
     file = request.files['image-file'].filename  # image query an image string path
-    # logger.info(f"Searching for {file}")
+    app.logger.info(f"Searching Elasticsearch index {index_name} for {file}")
 
     path = os.path.join(dir_test, file)
     with Image.open(path) as image:
@@ -96,13 +93,13 @@ def create_docs(directory, model, pca, transform, mapping):
         number of total features, as integer.
     """
     if not os.path.isdir(directory):
-        # logger.error(f"Provided path doesn't exist or isn't a directory ...")
+        app.logger.error(f"Provided path doesn't exist or isn't a directory ...")
         return None, 0
     elif model is None:
-        # logger.error(f"Provided deep-learning model is None ...")
+        app.logger.error(f"Provided deep-learning model is None ...")
         return None, 0
     elif pca is None:
-        # logger.error(f"Provided PCA model is None ...")
+        app.logger.error(f"Provided PCA model is None ...")
         return None, 0
 
     data = []
@@ -165,13 +162,13 @@ def create_queries(directory, model, pca, transform, num_labels):
         image queries, as list of dictionaries.
     """
     if not os.path.isdir(directory):
-        # logger.error(f"Provided path doesn't exist or isn't a directory ...")
+        app.logger.error(f"Provided path doesn't exist or isn't a directory ...")
         return None
     elif model is None:
-        # logger.error(f"Provided deep-learning model is None ...")
+        app.logger.error(f"Provided deep-learning model is None ...")
         return None
     elif pca is None:
-        # logger.error(f"Provided PCA model is None ...")
+        app.logger.error(f"Provided PCA model is None ...")
         return None
 
     queries = []
@@ -222,10 +219,10 @@ def write_results(results, path):
              file path, as string.
     """
     if (results is None) or (not results):
-        # logger.error("Number of search results is 0 ...")
+        app.logger.error("Number of search results is 0 ...")
         return
     elif os.path.isdir(path):
-        # logger.error("Provided path is a directory and not a file ...")
+        app.logger.error("Provided path is a directory and not a file ...")
         return
 
     with open(path, 'w') as f:
@@ -279,9 +276,9 @@ if __name__ == '__main__':
 
     # get available device (CPU/GPU)
     device = torch.device(f"cuda" if torch.cuda.is_available() else "cpu")
-    # logger.info(f'Using {device} device ...')
+    app.logger.info(f'Using {device} device ...')
 
-    # logger.info(f'Loading VGG-16 model from {path_vgg_16} ...')
+    app.logger.info(f'Loading VGG-16 model from {path_vgg_16} ...')
     # initialize VGG-16
     model = pretrained_models.initialize_model(pretrained=True,
                                                num_labels=len(label_mapping),
@@ -293,7 +290,7 @@ if __name__ == '__main__':
     # register hook
     model.classifier[5].register_forward_hook(get_features())
 
-    # logger.info(f'Loading PCA model from {path_pca} ...')
+    app.logger.info(f'Loading PCA model from {path_pca} ...')
     # load PCA pretrained model
     pca = joblib.load(path_pca)
 
@@ -305,11 +302,11 @@ if __name__ == '__main__':
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    # logger.info("Loading CIFAR-10 train data and creating Elasticsearch documents ...")
-    # images, num_features = create_docs(dir_train, model, pca, transform, label_mapping)
-    # if (images is None) or (num_features == 0):
-    #     logger.error("Number of Elasticsearch documents is 0 ...")
-    #     sys.exit(1)
+    app.logger.info("Loading CIFAR-10 train data and creating Elasticsearch documents ...")
+    images, num_features = create_docs(dir_train, model, pca, transform, label_mapping)
+    if (images is None) or (num_features == 0):
+        app.logger.error("Number of Elasticsearch documents is 0 ...")
+        sys.exit(1)
 
     # logger.info("Loading CIFAR-10 test data and creating Elasticsearch queries ...")
     # queries = create_queries(dir_test, model, pca, transform, len(label_mapping))
@@ -323,34 +320,36 @@ if __name__ == '__main__':
     number_of_shards = 30
     number_of_replicas = 0
 
-    # logger.info(f"Running Elasticsearch on {hosts} ...")
+    app.logger.info(f"Running Elasticsearch on {hosts} ...")
     # run Elasticsearch
     es = Elasticsearch(hosts=hosts, timeout=60, retry_on_timeout=True)
 
-    # logger.info(f"Creating Elasticsearch index {index_name} ...")
-    # # creating Elasticsearch index
-    # indexer = Indexer()
-    # indexer.create_index(es=es,
-    #                      name=index_name,
-    #                      number_of_shards=number_of_shards,
-    #                      number_of_replicas=number_of_replicas,
-    #                      num_features=num_features)
+    app.logger.info(f"Creating Elasticsearch index {index_name} ...")
+    # creating Elasticsearch index
+    indexer = Indexer()
+    indexer.create_index(es=es,
+                         name=index_name,
+                         number_of_shards=number_of_shards,
+                         number_of_replicas=number_of_replicas,
+                         num_features=num_features)
 
-    # logger.info(f"Indexing CIFAR-10 images ...")
-    # # indexing CIFAR-10 image documents
-    # indexer.index_images(es=es, name=index_name, images=images)
+    app.logger.info(f"Indexing CIFAR-10 images ...")
+    # indexing CIFAR-10 image documents
+    indexer.index_images(es=es, name=index_name, images=images)
 
     # logger.info(f"Searching Elasticsearch index {index_name} ...")
-    searcher = Searcher()
+    # searcher = Searcher()
     # results = searcher.search_index(es=es, name=index_name, queries=queries, k=100)
     # if (results is None) or (not results):
     #     logger.error("Number of search results is 0 ...")
     #     sys.exit(1)
 
-    # logger.info(f"Searching Elasticsearch index {index_name} ...")
+    searcher = Searcher()
+
+    # logger.info(f"Writing search results at {path_results} ...")
     # write_results(results, path_results)
 
-    # logger.info("Running application ...")
+    app.logger.info("Running application ...")
     app.run()
 
 
