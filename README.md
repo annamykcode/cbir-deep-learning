@@ -8,6 +8,7 @@
 * [Technologies](#technologies)
 * [What You Need](#what-you-need)
 * [Run the Application](#run-the-application)
+* [Demo](#demo)
 * [License](#license)
 
 ## Technologies
@@ -20,8 +21,8 @@
 **Other Libraries**: NumPy, Matplotlib
 
 ## What You Need
-* [Anaconda](https://www.anaconda.com/)
-* [Elasticsearch client](https://www.elastic.co/)
+* Anaconda
+* Elasticsearch client
 * Virtual environments from .yml files.
 
   * Create the environments from the **cbir-ml.yml** and **cbir-dl.yml** file:
@@ -52,6 +53,22 @@ To run the application:
   python app.py
   ```
 Then, on the browser, visit ``` http://localhost:5000/ ``` to open the web page.
+
+## Demo
+1. Run application.
+<p align="center">
+  <img src="/report/img/demo-1.png" alt="Demo pt.1"/>
+</p>
+
+2. Upload your image query and search.
+<p align="center">
+  <img src="/report/img/demo-2.png" alt="Demo pt.2"/>
+</p>
+
+2. Scroll down to see the top 10 relevant images, with respect to your query.
+<p align="center">
+  <img src="/report/img/demo-3.png" alt="Demo pt.3"/>
+</p>
       
 ## License
 Distributed under the MIT License. See [LICENSE.md](LICENSE.md) for more information
