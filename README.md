@@ -23,21 +23,24 @@
 * [Elasticsearch client](https://www.elastic.co/)
 * Virtual environments from .yml files.
 
-  * Create the environment from the **cbir-ml.yml** and **cbir-dl.yml** file:
+  * Create the environments from the **cbir-ml.yml** and **cbir-dl.yml** file:
       ```
       conda env create -f cbir-ml.yml 
       ```
       ```
       conda env create -f cbir-dl.yml 
       ```
-  * Activate the new environment (only cbir-dl is needed for the application): 
-      ```
-      conda activate cbir-dl
-      ```
+* CIFAR-10 dataset.
+
+  * Activate **cbir-ml** environment:
+    ```
+    conda activate cbir-ml
+    ```
   * Verify that the new environment was installed correctly:
-      ```
-      conda env list
-      ```
+    ```
+    conda env list
+    ```
+  * Run ``` notebooks/Search Engine Files (Miscellaneous).ipynb ``` jupyter notebook (no need to run the 3d section).
       
 ## License
 Distributed under the MIT License. See [LICENSE.md](LICENSE.md) for more information
