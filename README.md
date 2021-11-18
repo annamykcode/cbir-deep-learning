@@ -41,6 +41,7 @@
     conda env list
     ```
   * Run ``` notebooks/Search Engine Files (Miscellaneous).ipynb ``` jupyter notebook (no need to run the 3d section).
+  * The CIFAR-10 data can be found under ``` static/cifar10/ ```.
       
 ## License
 Distributed under the MIT License. See [LICENSE.md](LICENSE.md) for more information
