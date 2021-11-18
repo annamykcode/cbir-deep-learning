@@ -7,6 +7,7 @@
 ## Table of Contents
 * [Technologies](#technologies)
 * [What You Need](#what-you-need)
+* [Run the Application](#run-the-application)
 * [License](#license)
 
 ## Technologies
@@ -36,12 +37,21 @@
     ```
     conda activate cbir-ml
     ```
-  * Verify that the new environment was installed correctly:
-    ```
-    conda env list
-    ```
   * Run ``` notebooks/Search Engine Files (Miscellaneous).ipynb ``` jupyter notebook (no need to run the 3d section).
   * The CIFAR-10 data can be found under ``` static/cifar10/ ```.
+
+## Run the Application
+To run the application:
+* start Elasticsearch client (on Windows) by running ``` elasticsearch-x.xx.x/bin/elasticsearch.bat ```.
+* activate **cbir-dl** environment:
+  ```
+  conda activate cbir-dl
+  ```
+* run the following command in the terminal window (in the complete) directory:
+  ```
+  python app.py
+  ```
+Then, on the browser, visit ``` http://localhost:5000/ ``` to open the web page.
       
 ## License
 Distributed under the MIT License. See [LICENSE.md](LICENSE.md) for more information
