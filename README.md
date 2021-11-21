@@ -32,7 +32,7 @@ Although we communicate in a variety of ways with each other, our favorite way t
 
 There are two computer vision methods we've looked into:
 * **Bag of Visual Words**: The general idea is to represent an image as a set of features. Features consists of keypoints and descriptors. We use the keypoints and descriptors to construct visual vocabularies and then we quantize the image features. By doing so, we have successfully represented images as a frequency histogram of features that are in the images. With the use of visual vocabularies, later, we can perform many tasks, such as classification, retrieval and more.
-* **Visual Embeddings**: Refers to the collection of features of the last fully connected layer (prior to a loss layer) appended to a CNN. The visual embeddings are learned by jointly training the feature extractor with the embedding layer and the classifier. 
+* **Visual Embeddings**: Refers to the collection of features of the last fully connected layer (prior to a loss layer) appended to a CNN. The visual embeddings are learned by jointly training the feature extractor with the embedding layer and the classifier **on the classification task**. 
 
 The two Information Retrieval Systems we have explored, are evaluated using the **trec_eval** evaluation tool and its metrics. Our focus is mainly on the behaviour of **mean average precision** on the top 100 retrieved images.
 
