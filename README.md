@@ -18,7 +18,7 @@ Although we communicate in a variety of ways with each other, our favorite way t
  
 <p>
   <div>
-    This project's purpose is to find a way to make image retrieval as accurate as possible by laveraging computer vision methods. The idea that is proposed is simple yet
+    This project's purpose is to find a way to make image retrieval as accurate as possible by leveraging computer vision methods. The idea that is proposed is simple yet
     complex to implement:
   </div>
   <div align="center">
