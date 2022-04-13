@@ -39,7 +39,7 @@
                     <p><b>Filename: </b>{{ result["filename"] }}</p>
                 </div>
                 <div class="image">
-                    <img src="{{url_for('static', filename=result['path'].replace('static/', '').replace('\\', '/'))}}">
+                    <img src="{{url_for('static', filename=result['path'].replace('../static/', '').replace('\\', '/'))}}">
                 </div>
                 <div class="score">
                     <p><b>Score: </b>{{ result["score"] }}</p>

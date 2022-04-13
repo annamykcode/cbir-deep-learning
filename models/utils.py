@@ -87,6 +87,10 @@ def label_to_vector(label, mapping):
         label one-hot vector, as numpy array.
     """
     vec = np.zeros(len(mapping), dtype='int64')
-    vec[mapping[label]] = 1
+    # TODO: add logger, print is not shown
+    try:
+        vec[mapping[label]] = 1
+    except:
+        print(label)
 
     return vec

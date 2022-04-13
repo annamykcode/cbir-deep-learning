@@ -4,6 +4,9 @@ data/
 static/cifar10/
 notebooks/cifar10
 search-engine-results/
+saved-model/
+report/
+static/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

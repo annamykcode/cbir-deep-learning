@@ -94,5 +94,5 @@ class Indexer:
             images:
                 image documents, as a list of dictionaries.
         """
-        for image in tqdm(images):
+        for image in tqdm(images, desc="indexing images in ES"):
             es.index(index=name, body=image)
