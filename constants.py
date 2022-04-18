@@ -1,6 +1,6 @@
 # FIXME
-PATH_VGG_16 = r"C:\Users\ann\Code\challenges\cbir-deep-learning\saved-model\vgg16-weights.pth"
-PATH_PCA = r"C:\Users\ann\Code\challenges\cbir-deep-learning\saved-model\pca.joblib"
+PATH_VGG_16 = r"./saved-model/vgg16-weights.pth"
+PATH_PCA = r"./saved-model/pca.joblib"
 # CIFAR-10 labels to numbers
 # LABEL_MAPPING = {
 #     'airplane': 0,
