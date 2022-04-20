@@ -3,18 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="author" content="Lampros Lountzis">
+    <meta name="author" content="">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Ubuntu&display=swap" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
     <title>CBIR with Deep Learning</title>
+    <style>
+    .search {
+        background: url({{ image_path }}) no-repeat center/cover;
+    }
+    </style>
 </head>
+<!--../static/img/img-background.jpg-->
 <body>
     <div class="container">
         <nav class="navbar">
             <div class="creator">
-                <h4>Lampros Lountzis</h4>
+                <h4></h4>
             </div>
             <div class="project-name">
                 <h4>Content Based Image Retrieval (CBIR) with Deep Learning</h4>
@@ -22,19 +28,20 @@
         </nav>
 
         <section class="search">
-            <form method="post" enctype="multipart/form-data">
-                <input class="upload-btn" id="upload-btn" type="file" accept="image/png, image/jpeg" name="image-file">
-                <label for="upload-btn">Upload image</label>
-                <button class="search-btn" id="search-btn" type="submit" >Search</button>
+
+            <form method="post" id="form" enctype="multipart/form-data">
+                <input class="upload-btn" id="upload-btn" type="file" accept="image/png, image/jpeg" name="image-file" value="upload">
+                <label for="upload-btn">SELECT</label>
+                <button class="search-btn" id="search-btn" type="submit" name="search" value="search" >UPLOAD</button>
             </form>
         </section>
 
         <section class="results">
             {% for result in results %}
             <div class="result">
-                <div class="id">
-                    <p><b>ID: </b>{{ result["id"] }}</p>
-                </div>
+<!--                <div class="id">-->
+<!--                    <p><b>ID: </b>{{ result["id"] }}</p>-->
+<!--                </div>-->
                 <div class="title">
                     <p><b>Filename: </b>{{ result["filename"] }}</p>
                 </div>

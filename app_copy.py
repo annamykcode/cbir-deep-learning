@@ -19,7 +19,7 @@ from models import pretrained_models
 from index.indexer import Indexer
 from index.searcher import Searcher
 
-ES_PASSWORD = "stzpig12NHmwsOUyc4G1"
+ES_PASSWORD = "oCj76TXQ0tUUrVxznwoJ"
 # ES_DB_PATH = "es_db/cifar-10_20.json"
 ES_DB_PATH = "es_db/ford.json"
 
@@ -65,7 +65,7 @@ def search():
     app.logger.info(f"Searching Elasticsearch index {index_name} for {file}")
 
     # FIXME: dir_test is static
-    path = os.path.join(dir_test, file)
+    path = dir_test + '/' + file
     with Image.open(path) as image:
         # create dataset and dataloader objects for Pytorch
         dataset = ImageDataset([image], transform)
@@ -95,10 +95,10 @@ def search():
             'features': features_vec
         }
 
-    results = searcher.search_index(es=es, name=index_name, queries=[query], k=10)
+    results = searcher.search_index(es=es, name=index_name, queries=[query], k=5)
     results = results[0]['images']
 
-    return render_template('index.html', results=results)
+    return render_template('index.html', results=results, image_path=path)
 
 
 def create_queries(directory, model, pca, transform, num_labels):
